@@ -30,7 +30,7 @@ type Mutex struct {
 
 	nodem sync.Mutex
 
-	pools []*radix.Pool
+	pools []*radix.Cluster
 }
 
 // Lock locks m. In case it returns an error on failure, you may retry to acquire the lock by calling this method again.
@@ -111,7 +111,7 @@ func (m *Mutex) genValue() (string, error) {
 	return base64.StdEncoding.EncodeToString(b), nil
 }
 
-func (m *Mutex) acquire(pool *radix.Pool, value string) bool {
+func (m *Mutex) acquire(pool *radix.Cluster, value string) bool {
 	var reply string
 	err := pool.Do(radix.Cmd(&reply, "SET", m.name, value, "NX", "PX", strconv.Itoa(int(m.expiry/time.Millisecond))))
 	return err == nil && reply == "OK"
@@ -125,7 +125,7 @@ var deleteScript = radix.NewEvalScript(1, `
 	end
 `)
 
-func (m *Mutex) release(pool *radix.Pool, value string) bool {
+func (m *Mutex) release(pool *radix.Cluster, value string) bool {
 	var status int
 	err := pool.Do(deleteScript.Cmd(&status, m.name, value))
 	return err == nil && status != 0
@@ -139,7 +139,7 @@ var touchScript = radix.NewEvalScript(1, `
 	end
 `)
 
-func (m *Mutex) touch(pool *radix.Pool, value string, expiry int) bool {
+func (m *Mutex) touch(pool *radix.Cluster, value string, expiry int) bool {
 	var status string
 	err := pool.Do(touchScript.Cmd(&status, m.name, value, strconv.Itoa(expiry)))
 	return err == nil && status != "ERR"
