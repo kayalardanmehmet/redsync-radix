@@ -1,4 +1,4 @@
-package redsync
+package redsyncradix
 
 import (
 	"strconv"
