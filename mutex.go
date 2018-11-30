@@ -3,10 +3,11 @@ package redsync
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"strconv"
 	"sync"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/mediocregopher/radix"
 )
 
 // A DelayFunc is used to decide the amount of time to wait between retries.
@@ -29,7 +30,7 @@ type Mutex struct {
 
 	nodem sync.Mutex
 
-	pools []Pool
+	pools []*radix.Pool
 }
 
 // Lock locks m. In case it returns an error on failure, you may retry to acquire the lock by calling this method again.
@@ -110,14 +111,13 @@ func (m *Mutex) genValue() (string, error) {
 	return base64.StdEncoding.EncodeToString(b), nil
 }
 
-func (m *Mutex) acquire(pool Pool, value string) bool {
-	conn := pool.Get()
-	defer conn.Close()
-	reply, err := redis.String(conn.Do("SET", m.name, value, "NX", "PX", int(m.expiry/time.Millisecond)))
+func (m *Mutex) acquire(pool *radix.Pool, value string) bool {
+	var reply string
+	err := pool.Do(radix.Cmd(&reply, "SET", m.name, value, "NX", "PX", strconv.Itoa(int(m.expiry/time.Millisecond))))
 	return err == nil && reply == "OK"
 }
 
-var deleteScript = redis.NewScript(1, `
+var deleteScript = radix.NewEvalScript(1, `
 	if redis.call("GET", KEYS[1]) == ARGV[1] then
 		return redis.call("DEL", KEYS[1])
 	else
@@ -125,14 +125,13 @@ var deleteScript = redis.NewScript(1, `
 	end
 `)
 
-func (m *Mutex) release(pool Pool, value string) bool {
-	conn := pool.Get()
-	defer conn.Close()
-	status, err := deleteScript.Do(conn, m.name, value)
+func (m *Mutex) release(pool *radix.Pool, value string) bool {
+	var status int
+	err := pool.Do(deleteScript.Cmd(&status, m.name, value))
 	return err == nil && status != 0
 }
 
-var touchScript = redis.NewScript(1, `
+var touchScript = radix.NewEvalScript(1, `
 	if redis.call("GET", KEYS[1]) == ARGV[1] then
 		return redis.call("SET", KEYS[1], ARGV[1], "XX", "PX", ARGV[2])
 	else
@@ -140,9 +139,8 @@ var touchScript = redis.NewScript(1, `
 	end
 `)
 
-func (m *Mutex) touch(pool Pool, value string, expiry int) bool {
-	conn := pool.Get()
-	defer conn.Close()
-	status, err := redis.String(touchScript.Do(conn, m.name, value, expiry))
+func (m *Mutex) touch(pool *radix.Pool, value string, expiry int) bool {
+	var status string
+	err := pool.Do(touchScript.Cmd(&status, m.name, value, strconv.Itoa(expiry)))
 	return err == nil && status != "ERR"
 }
