@@ -3,7 +3,7 @@ package redsyncradix
 import (
 	"time"
 
-	"github.com/mediocregopher/radix"
+	"github.com/mediocregopher/radix/v3"
 )
 
 // Redsync provides a simple method for creating distributed mutexes using multiple Redis connection pools.
@@ -12,9 +12,10 @@ type Redsync struct {
 }
 
 // New creates and returns a new Redsync instance from given Redis connection pools.
-func New(pools []*radix.Pool) *Redsync {
+func New(pools interface{}) *Redsync {
+	radixPools := pools.([]*radix.Pool)
 	return &Redsync{
-		pools: pools,
+		pools: radixPools,
 	}
 }
 

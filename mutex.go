@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mediocregopher/radix"
+	"github.com/mediocregopher/radix/v3"
 )
 
 // A DelayFunc is used to decide the amount of time to wait between retries.
