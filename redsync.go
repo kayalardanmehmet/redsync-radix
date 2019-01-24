@@ -8,12 +8,12 @@ import (
 
 // Redsync provides a simple method for creating distributed mutexes using multiple Redis connection pools.
 type Redsync struct {
-	pools []*radix.Cluster
+	pools []radix.Client
 }
 
 // New creates and returns a new Redsync instance from given Redis connection pools.
 func New(pools interface{}) *Redsync {
-	radixPools := pools.([]*radix.Cluster)
+	radixPools := pools.([]radix.Client)
 	return &Redsync{
 		pools: radixPools,
 	}
